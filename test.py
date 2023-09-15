@@ -3,7 +3,7 @@ import redis
 import random
 import time
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 import matplotlib
 from fastapi import FastAPI
@@ -90,31 +90,32 @@ async def store3(measurement: Measurement):
 @app.get("/getdata1/{sensor}/{from_time}/{to_time}")
 def getdata(sensor:str, from_time: str, to_time:str):
     # get data between two timestamps
-    try:
-        rescl=redis.Redis(host=HOST,port=PORT)           
-        device_name = sensor
-        startepoch = from_time
-        endepoch=to_time
-        res = rescl.ts().range(device_name, startepoch, endepoch)
-        df=pd.DataFrame(res)
-        df.columns = ["datetime", "value"]
-        return df.to_json()
-        # return "READ SUCCESSFUL!"
-    except Exception as e:
-        Print(e)
-        return "Error!"
-    
-@app.get("/getdata/{sensor}/{from_time}/{to_time}")
-def getdata(sensor:str, from_time: str, to_time:str):
-    # get data between two timestamps
-    try:
-        rescl=redis.Redis(host=HOST,port=PORT)           
+    try:         
         device_name = sensor
         startiso = from_time
         endiso=to_time
         startepoch = int(isoparse(startiso).timestamp())*1000
         endepoch=int(isoparse(endiso).timestamp())*1000
-        res = rescl.ts().range(device_name, startepoch, endepoch)
+        res = rc.conn.ts().range(device_name, startepoch, endepoch)
+        df=pd.DataFrame(res)
+        df.columns = ["datetime", "value"]
+        df.datetime = pd.to_datetime(df.datetime, unit="ms", utc=True).map(lambda x: x.tz_convert('Asia/Kolkata'))
+        return df.to_dict()
+        # return "READ SUCCESSFUL!"
+    except Exception as e:
+        Print(e)
+        return e
+    
+@app.get("/getdata/{sensor}/{from_time}/{to_time}")
+def getdata(sensor:str, from_time: str, to_time:str):
+    # get data between two timestamps
+    try:          
+        device_name = sensor
+        startiso = from_time
+        endiso=to_time
+        startepoch = int(isoparse(startiso).timestamp())*1000
+        endepoch=int(isoparse(endiso).timestamp())*1000
+        res = rc.conn.ts().range(device_name, startepoch, endepoch)
         df=pd.DataFrame(res)
         df.columns = ["datetime", "value"]
         df.datetime = pd.to_datetime(df.datetime, unit="ms", utc=True).map(lambda x: x.tz_convert('Asia/Kolkata'))
@@ -146,8 +147,7 @@ def getdata(sensor:str, from_time: str, to_time:str):
 @app.get("/aggregate/{sensor}/{from_time}/{to_time}/{agr_function}/{time_unit}")
 async def aggregate(sensor:str, from_time: str, to_time:str,agr_function:str,time_unit:int):
     # get data between two timestamps
-    try:
-        rescl=redis.Redis(host=HOST,port=PORT)           
+    try:          
         device_name = sensor
         startiso = from_time
         timebucket= time_unit
@@ -155,10 +155,10 @@ async def aggregate(sensor:str, from_time: str, to_time:str,agr_function:str,tim
         endiso=to_time
         startepoch = int(isoparse(startiso).timestamp())*1000
         endepoch=int(isoparse(endiso).timestamp())*1000
-        res = rescl.ts().range(device_name, startepoch, endepoch,None,agr_fun,timebucket)
+        res = rc.conn.ts().range(device_name, startepoch, endepoch,None,agr_fun,timebucket)
         df=pd.DataFrame(res)
         df.columns = ["datetime", "value"]
-        df.set_index ('datetime')
+        df.datetime = pd.to_datetime(df.datetime, unit="ms", utc=True).map(lambda x: x.tz_convert('Asia/Kolkata'))
         return df.to_dict()
         # return "READ SUCCESSFUL!"
     except Exception as e:
