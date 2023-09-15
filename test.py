@@ -117,7 +117,7 @@ def getdata(sensor:str, from_time: str, to_time:str):
         res = rescl.ts().range(device_name, startepoch, endepoch)
         df=pd.DataFrame(res)
         df.columns = ["datetime", "value"]
-        df.set_index ('datetime')
+        df.datetime = pd.to_datetime(df.datetime, unit="ms", utc=True).map(lambda x: x.tz_convert('Asia/Kolkata'))
         return df.to_dict()
         # return "READ SUCCESSFUL!"
     except Exception as e:
